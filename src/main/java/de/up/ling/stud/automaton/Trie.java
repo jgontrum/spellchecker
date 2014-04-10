@@ -7,8 +7,13 @@ package de.up.ling.stud.automaton;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -16,12 +21,18 @@ import java.util.Set;
  * @author Johannes Gontrum <gontrum@uni-potsdam.de>
  */
 public class Trie {
-    protected Int2ObjectMap<Trie> branches;
-    protected int wordCount;
+    private Int2ObjectMap<Trie> branches;
+    private int id;
+    private IntSet usedIDs;
+    private boolean finalState;
+    private final IDCounter idCounter;
     
-    public Trie() {
-        branches = new Int2ObjectOpenHashMap<Trie>();
-        wordCount = 0;
+    public Trie(int id, IDCounter idCounter, IntSet usedIDs) {
+        this.branches = new Int2ObjectOpenHashMap<Trie>();
+        this.id = id;
+        this.usedIDs = usedIDs;
+        this.finalState = false;
+        this.idCounter = idCounter;
     }
     
     /**
@@ -29,26 +40,51 @@ public class Trie {
      * @param key
      * @param value
      */
-    public void put(int[] key) {
-        put(key, 0);
+    public int put(int[] key) {
+        return put(key, 0);
+    }
+    
+    public void putWithID(int[] key, int id) {
+        putWithID(key, id, 0);
     }
     
     // Recursive call for put. 
-    protected void put(int[] key,  int index) {
-        if (index == key.length) {
-            ++wordCount;
+    private int put(int[] key, int index) {
+        if (index == key.length || key[index] == 0) {
+            finalState = true;
+            return id;
         } else {
             int currentKey = key[index];
             Trie nextTrie = branches.get(currentKey);
             
             // if there is no next trie, we have to create it
             if (nextTrie == null) {
-                nextTrie = new Trie();
+                nextTrie = new Trie(idCounter.getNextID(), idCounter, usedIDs);
                 branches.put(currentKey, nextTrie);
             }
             
             // go on recursivly, but move the index pointer to the next value in the key array
-            nextTrie.put(key, index+1);
+            return nextTrie.put(key, index+1);
+        }
+    }
+    
+    // Recursive call for put. 
+    private void putWithID(int[] key, int id, int index) {
+        if (index == key.length || key[index] == 0) {
+            this.id = id;
+            this.finalState = true;
+        } else {
+            int currentKey = key[index];
+            Trie nextTrie = branches.get(currentKey);
+
+            // if there is no next trie, we have to create it
+            if (nextTrie == null) {
+                nextTrie = new Trie(idCounter.getNextID(), idCounter, usedIDs);
+                branches.put(currentKey, nextTrie);
+            }
+
+            // go on recursivly, but move the index pointer to the next value in the key array
+            nextTrie.putWithID(key, id, index + 1);
         }
     }
     
@@ -57,9 +93,9 @@ public class Trie {
         return contains(needle, 0);
     }
     
-    protected boolean contains(int[] needle, int index) {
+    private boolean contains(int[] needle, int index) {
         if (index == needle.length) {
-            return wordCount > 0;
+            return isFinal();
         } else {
             int currentKey = needle[index];
             Trie nextTrie = branches.get(currentKey);
@@ -69,6 +105,25 @@ public class Trie {
             }
             
             return nextTrie.contains(needle, index+1);
+        }
+    }
+    
+    public int getID(int[] needle) {
+        return getID(needle, 0);
+    }
+
+    private int getID(int[] needle, int index) {
+        if (index == needle.length) {
+            return id;
+        } else {
+            int currentKey = needle[index];
+            Trie nextTrie = branches.get(currentKey);
+
+            if (nextTrie == null) {
+                return -1;
+            }
+
+            return nextTrie.getID(needle, index + 1);
         }
     }
     
@@ -86,9 +141,30 @@ public class Trie {
         return branches.keySet();
     }
     
-    public int numOfTransitions() {
-        assert branches.keySet().size() == getAllTransitions().size();
-        return branches.keySet().size();
+    public boolean isFinal() {
+        return finalState;
+    }
+
+    public int getNextID() {
+        return idCounter.getNextID();
+    }
+
+    public void saveWordsAndID(int[] currentWord, BufferedWriter bw) throws IOException {
+        for (int a: branches.keySet()) {
+            int[] ret = new int[currentWord.length+1];
+            System.arraycopy(currentWord, 0, ret, 0, currentWord.length);
+            ret[currentWord.length] = a;
+            branches.get(a).saveWordsAndID(ret, bw);
+        }
+        if (isFinal()) {
+            for (int i = 0; i < currentWord.length; ++i) {
+                bw.write(currentWord[i]);
+                if (i != currentWord.length-1) {
+                    bw.write(",");
+                }
+            }
+            bw.write(":" + id + "\n");
+        }
     }
     
     public Set<IntArrayList> getAllConcatinations() {
@@ -111,22 +187,22 @@ public class Trie {
             }
         }
         
-        if (wordCount > 0) {
+        if (isFinal()) {
             ret.add(new IntArrayList());
         }
         
         return ret;
     }
     
-    
-    public boolean isFinal() {
-        return wordCount > 0;
+    private int getNewID() {
+        int ret = usedIDs.size() + 1;
+        while (usedIDs.contains(ret)) {
+            ++ret;
+        }
+        usedIDs.add(ret);
+        return ret;
     }
     
-    public int getWordCount() {
-        return wordCount;
-    }
-
     @Override
     public String toString() {
         StringBuilder buf = new StringBuilder("Concatenations in Trie:\n");
@@ -137,5 +213,79 @@ public class Trie {
     }
     
     
-    
+    ////////////////////////////////////////////////////////
+    /// Functions for drawing the Trie in graphviz format.
+    private String drawTransitions(IntList history, List<String> nodes) {
+        StringBuilder ret = new StringBuilder();
+        String currentState = "T(" + intListToString(history) + ")";
+        for (int a : branches.keySet()) {
+            if (branches.get(a) != null) {
+                String label;
+                if (a == 0) {
+                    label = "|";
+                } else {
+                    label = String.valueOf((char) a);
+                }
+                IntList newHistory = new IntArrayList(history);
+                newHistory.add(a);
+                if (branches.get(a).isFinal()) {
+                    nodes.add("node [shape = doublecircle, label=\"T(" + intListToString(newHistory) + ")\\n" + branches.get(a).printExtra()
+                            + "\", fontsize=12] \"T(" + intListToString(newHistory) + ")\";");
+                } else {
+                    nodes.add("node [shape = circle, label=\"T(" + intListToString(newHistory) + ")\\n" + branches.get(a).printExtra()
+                            + "\", fontsize=12] \"T(" + intListToString(newHistory) + ")\";");
+                }
+                ret.append("   \"" + currentState + "\" -> \"T(" + intListToString(newHistory) + ")\" [ label = \"" + label + "\" ];\n");
+                ret.append(branches.get(a).drawTransitions(newHistory, nodes));
+            }
+        }
+
+        return ret.toString();
+    }
+
+    public String draw() {
+        StringBuilder ret = new StringBuilder();
+        IntList history = new IntArrayList();
+        List<String> nodes = new ArrayList<String>();
+        if (isFinal()) {
+            nodes.add("node [shape = doublecircle, label=\"T()\\n" + printExtra()
+                    + "\", fontsize=12] \"T()\";");
+        } else {
+            nodes.add("node [shape = circle, label=\"T()\\n" + printExtra()
+                    + "\", fontsize=12] \"T()\";");
+        }
+        String transitions = drawTransitions(history, nodes);
+
+        ret.append("digraph finite_state_machine {\n"
+                + "  rankdir=LR;\n"
+                + "  size=\"8,5\";\n");
+
+        for (String q : nodes) {
+            ret.append("  " + q + "\n");
+        }
+
+        ret.append(transitions);
+
+        ret.append("}");
+        return ret.toString();
+    }
+
+    private String intListToString(IntList list) {
+        StringBuilder ret = new StringBuilder();
+        for (int s : list) {
+            if (s != 0) {
+                ret.append(String.valueOf((char) s));
+            } else {
+                ret.append("|");
+            }
+        }
+        return ret.toString();
+    }
+
+    String printExtra() {
+        StringBuilder ret = new StringBuilder();
+        ret.append("id: " + id);
+        return ret.toString();
+    }
+
 }
