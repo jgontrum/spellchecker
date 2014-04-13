@@ -15,14 +15,13 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
-import java.util.StringTokenizer;
+import java.util.regex.Pattern;
 import java.util.zip.*;
 
 
@@ -37,6 +36,9 @@ public class StringTrie {
     private int context;
     private final static int delimiter = 0;
     private boolean verbose = false;
+    // Define a pattern for the tokenizer, that matches all characters, that are not letters.
+    // This includes german umlauts as well. Taken from: http://stackoverflow.com/a/1612015
+    private static final Pattern tokenizerPattern = Pattern.compile("[^\\p{L}]");
     
     ////////////////////////////////////////////////////////////////////////////
     ///// Constructors
@@ -113,8 +115,11 @@ public class StringTrie {
      * @param filename
      * @throws IOException
      */
-    public void putFile(String filename) throws IOException {
-        BufferedReader buffer = new BufferedReader(new FileReader(new File(filename)));
+    public void putFile(String filename, String encoding) throws IOException {
+        InputStream textInputStream = new FileInputStream(new File(filename));
+        Reader textInReader = new InputStreamReader(textInputStream, encoding);
+        BufferedReader buffer = new BufferedReader(textInReader);
+     
         String currentLine;
         String currentWord;
         double currentLineNumber = 0.0;
@@ -135,13 +140,14 @@ public class StringTrie {
         
         while ((currentLine = buffer.readLine()) != null) {
             ++currentLineNumber;
-            StringTokenizer tokenizer = new StringTokenizer(currentLine, " .,\"'-=;:<>/\\+()*!?&^%$#@!~`{}[]\n????");
-            
+
             // Tokenize the current line
-            while (tokenizer.hasMoreElements()) {
-                currentWord = tokenizer.nextToken();
-                for (int i = 0; i < context - 1; i++) {
-                    idWindow[i] = idWindow[i + 1]; // move the window to the left
+            String[] tokenized = tokenizerPattern.split(currentLine);
+            for (int i = 0; i < tokenized.length; i++) {
+                currentWord = tokenized[i];
+
+                for (int j = 0; j < context - 1; j++) {
+                    idWindow[j] = idWindow[j + 1]; // move the window to the left
                 }
 
                 int currentID = put(currentWord); // Save word in trie and get id for it

@@ -1,5 +1,6 @@
 package de.up.ling.stud.automaton;
 
+import de.saar.basic.Pair;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -14,7 +15,7 @@ import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.Writer;
 import java.util.Iterator;
-import java.util.StringTokenizer;
+import java.util.regex.Pattern;
 
 /**
  * Class for interaction between the command line and the spell checker classes.
@@ -35,9 +36,12 @@ public class App {
     private static int ngram;
     private static StringTrie data;
     private static int numSuggestions;
-    
+    // Define a pattern for the tokenizer, that matches all characters, that are not letters.
+    // This includes german umlauts as well. Taken from: http://stackoverflow.com/a/1612015
+    private static final Pattern tokenizerPattern = Pattern.compile("[^\\p{L}]");
+   
     public static void main( String[] args ) throws FileNotFoundException, IOException {
-        numSuggestions = 5;
+        numSuggestions = 5; // The number of wor candidates, that will be printed, when --details is enabled
         if (args.length < 2) {
             printInfo();
             System.exit(1);
@@ -59,7 +63,7 @@ public class App {
                 verbose("Creating a new trie from a corpus. This can take a while.");
                 data = new StringTrie(ngram);
                 data.setVerbose(verbose);
-                data.putFile(corpus);
+                data.putFile(corpus,encoding);
                 verbose("Done!");
                 if (!saveTo.equals("")) {
                     verbose("Saving the trie to a file. This can take a while.");
@@ -105,33 +109,36 @@ public class App {
         for (int i = 0; i < ngram; i++) {
             window[i] = "";
         }
-        
+
+        // Tokenize the current line.
         while ((currentLine = textIn.readLine()) != null) {
-            StringTokenizer tokenizer = new StringTokenizer(currentLine, " .,\"'-=;:<>/\\+()*!?&^%$#@!~`{}[]\n");
-            while (tokenizer.hasMoreElements()) { // tokenize line
-                currentWord = tokenizer.nextToken();
-                for (int i = 0; i < ngram - 1; i++) {
-                    window[i] = window[i + 1]; // move the window to the left
+            String[] tokenized = tokenizerPattern.split(currentLine);
+            for (int i = 0; i < tokenized.length; i++) {
+                currentWord = tokenized[i];
+                
+                for (int j = 0; j < ngram - 1; j++) {
+                    window[j] = window[j + 1]; // move the window to the left
                 }
 
                 window[ngram - 1] = currentWord;
                                 
-                Iterator<String> candidates = corrector.correctWordInContext(window).iterator();
+                Iterator<Pair<String,Double>> candidates = corrector.correctWordInContext(window).iterator();
                 
                 if (candidates.hasNext()) {
                     if (details) {
                         textOut.write(currentWord + "\t\t|Suggestions: ");
                         verbose("Correcting the word \"" + currentWord + "\" to: ");
-                        for (int i = 0; i < numSuggestions && candidates.hasNext(); i++) {
-                            String currentSuggestion = candidates.next();
-                            verbose("  " + currentSuggestion);
+                        for (int j = 0; j < numSuggestions && candidates.hasNext(); j++) {
+                            Pair<String,Double> currentPair = candidates.next();
+                            String currentSuggestion = currentPair.left;
+                            verbose(" * " + currentSuggestion + "  \t(" + currentPair.right+ ")");
                             textOut.write(currentSuggestion);
-                            textOut.write((i == numSuggestions-1 || !candidates.hasNext())? "" : ", ");
+                            textOut.write((j == numSuggestions-1 || !candidates.hasNext())? "" : ", ");
                         }
                         verbose("");
                         textOut.newLine();
                     } else {
-                        String currentSuggestion = candidates.next();
+                        String currentSuggestion = candidates.next().left;
                         textOut.write(currentSuggestion + " ");
                         verbose("Correcting the word \"" + currentWord + "\" to \"" + currentSuggestion + "\".");
                     }

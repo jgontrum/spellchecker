@@ -31,7 +31,7 @@ public class BackOffModelTrie {
     
     public BackOffModelTrie(int currentNGram, int overallNGram) {
         branches = new Int2ObjectOpenHashMap<BackOffModelTrie>();   
-        probability = 0; // Default value, if the probability is not calculated yet.
+        probability = Double.POSITIVE_INFINITY; // Default value, if the probability is not calculated yet.
         count = 0;  
         nGram = currentNGram;
         allNGram = overallNGram;

@@ -5,67 +5,60 @@
 package de.up.ling.stud.automaton;
 
 import com.google.common.base.Function;
-import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.PriorityQueue;
-import java.util.Set;
 import java.util.Stack;
 import com.google.common.collect.Iterables;
-import com.sun.crypto.provider.AESWrapCipher;
+import de.saar.basic.Pair;
 import it.unimi.dsi.fastutil.ints.IntIterator;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.IOException;
-import java.util.Iterator;
 import java.util.Objects;
-import java.util.StringTokenizer;
 
 /**
- *
+ * Corrects a word or a word in a context and delivers an iterator over possible
+ * candidates.
  * @author Johannes Gontrum <gontrum@uni-potsdam.de>
  */
 public class Corrector {
+
     private StringTrie lexicon;
     private final Comparator<WeightedWord> compareWeigtedWords;
-    private final int maxThreshold;
-    private final double inLexiconFactor;
+    private final int maxThreshold; // the maximal error threshold for a candidates
+    private final int minCandidates; // the minimal number of candidats that sould be found.
     private final EditDistance editDistance;
     private final CutOffEditDistance cutOffEditDistance;
-    
+
     public Corrector(StringTrie lexicon) {
         this.lexicon = lexicon;
-        this.maxThreshold = 2;
-        this.inLexiconFactor = 100;
+        this.maxThreshold = 3;
+        this.minCandidates = 5;
         this.editDistance = new EditDistance();
         this.cutOffEditDistance = new CutOffEditDistance(editDistance);
-        
+
         // define comparator for the queue
         compareWeigtedWords = new Comparator<WeightedWord>() {
             public int compare(WeightedWord elem1, WeightedWord elem2) {
-                return (elem1.getWord().equals(elem2.getWord()))
+                return (elem1.getWordID() == elem2.getWordID())
                         ? 0 // elements are equal
-                        : (elem1.getWeight() < elem2.getWeight()
-                        ? 1 // elem1 is smaller 
-                        : -1);		// elem1 is greater
+                        : (elem1.getWeight() > elem2.getWeight()
+                        ? 1             // elem1 is greater 
+                        : -1);		// elem1 is smaller
             }
         };
     }
-    
+
     /**
-     * 
+     *
      * @param context = [PrevWord1, PrevWord2, MisspelledWord[
      * @return
      */
-    public Iterable<String> correctWordInContext(String[] context) {
+    public Iterable<Pair<String, Double>> correctWordInContext(String[] context) {
         assert lexicon != null;
         int nGram = context.length;
         int[] wordIDs = new int[nGram];
-        int[] misspelledWord = StringTrie.stringToIntArray(context[nGram-1]);
+        int[] misspelledWord = StringTrie.stringToIntArray(context[nGram - 1]);
         int localMaxThreshold = maxThreshold; // The maximum of editdistances that we consider.
+        
         // create the context for the language model:
         // Convert every context word to an int array and get the wordID of it.
         // As soon as a context word is not found, stop the process.
@@ -76,80 +69,50 @@ public class Corrector {
             wordIDs[i] = lexicon.getWordID(wordAsIntArray);
         }
         wordIDs[0] = -1; // Set a dummy value for the cell, where the candidates will be placed.
-                
+
         // Check first, if the word is in the lexicon (must not be the correct one though)
         boolean inLexicon = lexicon.contains(misspelledWord);
-        System.err.println("in? " + inLexicon);
         // If the current word is in the lexicon, we calculate only the distances from 1 to 2,
         // to check if the word is maybe very unplausible in the given context.
         if (inLexicon) {
             localMaxThreshold = 1;
         }
+
+        // Create a PriorityQueueSet, that has a special, destructive iterator (needed for the output - 
+        // the default iterator ignores the order in the queue)
+        // and that makes sure, that there are no dublicted elements in the queue.
+        PriorityQueueSet<WeightedWord> candidates = new PriorityQueueSet<WeightedWord>(50, compareWeigtedWords);
         
-        // find all candidates
-        PriorityQueue<WeightedWord> candidates = new PriorityQueue<WeightedWord>(15, compareWeigtedWords);
-        candidates.addAll(correctWord(misspelledWord, wordIDs, localMaxThreshold));
+        for (int i = 0; i <= localMaxThreshold || candidates.size() < minCandidates; ++i) {
+            candidates.addAll(correctWord(misspelledWord, wordIDs, i));
+        }
         
-        
+        // Transform the items of the queue to strings only when needed
         return Iterables.transform(candidates,
-                new Function<WeightedWord, String>() {
-            public String apply(WeightedWord word) {
-//                System.err.println(word.getWord() + " \t " + word.getWeight());
-                return word.getWord();
+                new Function<WeightedWord, Pair<String, Double>>() {
+            public Pair<String, Double> apply(WeightedWord word) {
+                int [] wordAsIntArray = lexicon.getWordByID(word.getWordID());
+                String wordAsString = StringTrie.intArrayToString(wordAsIntArray);
+                
+                return new Pair<String, Double>(wordAsString, word.getWeight());
             }
         });
     }
-    
+
     /**
-     *
+     * Delivers possible candidates for a word.
      * @param misspelledWord
      * @return
      */
-    public Iterable<String> correctWord(String misspelledWord) {
+    public Iterable<Pair<String,Double>> correctWord(String misspelledWord) {
         String[] tempArray = new String[1];
         tempArray[0] = misspelledWord;
         return correctWordInContext(tempArray);
     }
-    
-    public void correctText(String filename) throws FileNotFoundException, IOException {
-        BufferedReader buffer = new BufferedReader(new FileReader(new File(filename)));
-        String currentLine;
-        String currentWord;
 
-        Corrector cor = new Corrector(lexicon);
-
-
-        String[] window = new String[lexicon.getNGram()];
-        for (int i = 0; i < lexicon.getNGram(); i++) {
-            window[i] = "";
-        }
-
-        while ((currentLine = buffer.readLine()) != null) {
-            StringTokenizer tokenizer = new StringTokenizer(currentLine, " .,\"'-=;:<>/\\+()*!?&^%$#@!~`{}[]\n«»");
-            while (tokenizer.hasMoreElements()) {
-                currentWord = tokenizer.nextToken();
-                for (int i = 0; i < lexicon.getNGram() - 1; i++) {
-                    window[i] = window[i + 1]; // move the window to the left
-                }
-
-                window[lexicon.getNGram() - 1] = currentWord;
-                System.err.println("Current Word: " + currentWord);
-                Iterator<String> candidates = cor.correctWordInContext(window).iterator();
-
-                for (int i = 0; i < 5; i++) {
-                    if (candidates.hasNext()) {
-                        System.err.println("What about      " + candidates.next());
-                    }
-                }
-
-            }
-        }
-    }
-    
-    
     // This method generates a priority queue for candidates the given word can
     //  be corrected to within a given error threshold.
-    private PriorityQueue<WeightedWord> correctWord(int[] misspelledWord, int[] context, int errorThreshold) {        
+    private PriorityQueue<WeightedWord> correctWord(int[] misspelledWord, int[] context, int errorThreshold) {
         // This is nearly a direct implementation of the algorithm of Oflazar.
         // It is agenda-driven (it hold unfinished concatenations of symbols 
         // and a reference to the subtrie - a subtrie of 'lexicon'. 
@@ -166,7 +129,7 @@ public class Corrector {
         IntIterator symbolIt;
         int coDistance;
         int edDistance;
-        
+
         // Add a starting item: An empyy word and the whole trie (=> starting state)
         agenda.add(new AgendaItem(new int[0], lexicon.getLexicon()));
         while (!agenda.empty()) {
@@ -177,7 +140,7 @@ public class Corrector {
 
             // Iterate over all outgoing transitions
             symbolIt = currentTrie.getAllTransitions().iterator();
-            while (symbolIt.hasNext()) { 
+            while (symbolIt.hasNext()) {
                 int transitionSymbol = symbolIt.next();
 //                System.err.println("TransitionSymbol: " + (char) transitionSymbol);
                 // Creat the array for the new candidate. This candidate is like the 
@@ -186,39 +149,43 @@ public class Corrector {
                 // Copy the old concatenation to the new one and add the current symbol.
                 System.arraycopy(currentConcatenation, 0, newCandidate, 0, currentLength);
                 newCandidate[currentLength] = transitionSymbol;
-                
+
                 // Now calculate the cutoff-edit distance
                 coDistance = cutOffEditDistance.calcCutOffDistance(misspelledWord, newCandidate, errorThreshold);
                 if (coDistance <= errorThreshold) {
                     // If it is below the threshold, add it to the agenda.
                     agenda.push(new AgendaItem(newCandidate, currentTrie.getSubtrieByTransitionSymbol(transitionSymbol)));
                 }
-                
+
             }
             // Also, if the state of the current candidate is final and the edit distance is ok, it is a valid cadidate.
             edDistance = editDistance.calcDistance(misspelledWord, currentConcatenation);
             if (edDistance <= errorThreshold && currentTrie.isFinal()) {
                 // Retrive the wordid of the candidate from the lexicon and add it to the first cell of the context array.
                 context[0] = lexicon.getWordID(currentConcatenation);
-                double p;
-                                
-                if (edDistance == 0) { // correct word should have a huge advantage!
-//                    System.err.println("W already exists with p=" + lexicon.getBackOffProbability(context));
-                    p = lexicon.getBackOffProbability(context) + 1000;
-//                    System.err.println("Calculated: " + p);
-                } else {
-                    // Now we lookup the back-off-probability in the language model. 
-                    p = lexicon.getBackOffProbability(context) + Math.log(Math.pow((1.0) / edDistance + 1, 20));
+                
+                double backOffDistance = lexicon.getBackOffProbability(context);
+                
+                // Make sure, the context is found in the model
+                if (backOffDistance < Double.POSITIVE_INFINITY) {
+                    // This is not the best way to weight the edit distance and the probability, but at least
+                    // it is way...
+                    double p = edDistance - (1 / (lexicon.getBackOffProbability(context)));
+                    
+                    WeightedWord word = new WeightedWord(context[0], p);
+                    if (!candidates.contains(word)) {
+                        candidates.add(word);
+                    }
                 }
-                
-                
-                candidates.add(new WeightedWord(StringTrie.intArrayToString(currentConcatenation), p));
             }
         }
-        
+
         return candidates;
     }
-        
+    
+    ////////////////////////////////////////////////////////////////////////////
+    ///// Privated classes
+
     private class AgendaItem {
         private final int[] concatenation;
         private final Trie subTrie;
@@ -227,11 +194,11 @@ public class Corrector {
             this.concatenation = concatenation;
             this.subTrie = subTrie;
         }
-        
+
         public int[] getConcatenation() {
             return concatenation;
         }
-        
+
         public Trie getTrie() {
             return subTrie;
         }
@@ -241,18 +208,18 @@ public class Corrector {
             return "AgendaItem{" + "concatenation=" + Arrays.toString(concatenation) + ", subTrie=" + subTrie.hashCode() + '}';
         }
     }
-    
+
     private class WeightedWord {
-        private final String word;
+        private final int wordID;
         private final double weight;
 
-        public WeightedWord(String word, double weight) {
-            this.word = word;
+        public WeightedWord(int wordID, double weight) {
+            this.wordID = wordID;
             this.weight = weight;
         }
 
-        public String getWord() {
-            return word;
+        public int getWordID() {
+            return wordID;
         }
 
         public double getWeight() {
@@ -261,9 +228,9 @@ public class Corrector {
 
         @Override
         public int hashCode() {
-            int hash = 3;
-            hash = 41 * hash + Objects.hashCode(this.word);
-            hash = 41 * hash + (int) (Double.doubleToLongBits(this.weight) ^ (Double.doubleToLongBits(this.weight) >>> 32));
+            int hash = 5;
+            hash = 97 * hash + this.wordID;
+            hash = 97 * hash + (int) (Double.doubleToLongBits(this.weight) ^ (Double.doubleToLongBits(this.weight) >>> 32));
             return hash;
         }
 
@@ -276,20 +243,16 @@ public class Corrector {
                 return false;
             }
             final WeightedWord other = (WeightedWord) obj;
-            if (!Objects.equals(this.word, other.word)) {
-                return false;
-            }
-            if (Double.doubleToLongBits(this.weight) != Double.doubleToLongBits(other.weight)) {
+            if (this.wordID != other.wordID) {
                 return false;
             }
             return true;
         }
-
+        
+        
         @Override
         public String toString() {
-            return "weightedWord{" + "word=" + word + ", weight=" + weight + '}';
+            return "weightedWord{" + "wordID=" + wordID + ", weight=" + weight + '}';
         }
-
     }
 }
-

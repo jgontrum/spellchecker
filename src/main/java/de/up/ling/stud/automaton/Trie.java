@@ -194,14 +194,6 @@ public class Trie {
         return ret;
     }
     
-    private int getNewID() {
-        int ret = usedIDs.size() + 1;
-        while (usedIDs.contains(ret)) {
-            ++ret;
-        }
-        usedIDs.add(ret);
-        return ret;
-    }
     
     @Override
     public String toString() {
