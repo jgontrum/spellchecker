@@ -24,12 +24,12 @@ import java.io.Reader;
 import java.util.regex.Pattern;
 import java.util.zip.*;
 
-
 /**
  *
  * @author Johannes Gontrum <gontrum@uni-potsdam.de>
  */
 public class StringTrie {
+
     private Trie actualTrie;
     private BackOffModelTrie contextTrie;
     private final Int2ObjectMap<int[]> idToWordMap;
@@ -39,33 +39,35 @@ public class StringTrie {
     // Define a pattern for the tokenizer, that matches all characters, that are not letters.
     // This includes german umlauts as well. Taken from: http://stackoverflow.com/a/1612015
     private static final Pattern tokenizerPattern = Pattern.compile("[^\\p{L}]");
-    
+
     ////////////////////////////////////////////////////////////////////////////
     ///// Constructors
     ////////////////////////////////////////////////////////////////////////////
     /**
-     * Initialize the String Trie with a default context of 3.
-     * Put words into the trie and call the 'postProcessing()'-method afterwards.
+     * Initialize the String Trie with a default context of 3. Put words into
+     * the trie and call the 'postProcessing()'-method afterwards.
      */
-    public StringTrie()  {
+    public StringTrie() {
         idToWordMap = new Int2ObjectOpenHashMap<int[]>();
         init(3);
     }
-    
+
     /**
-     * Create a new String Trie with a given context (nGram)
-     * Put words into the trie and call the 'postProcessing()'-method afterwards.
+     * Create a new String Trie with a given context (nGram) Put words into the
+     * trie and call the 'postProcessing()'-method afterwards.
+     *
      * @param context
      */
     public StringTrie(int context) {
         idToWordMap = new Int2ObjectOpenHashMap<int[]>();
         init(context);
     }
-    
+
     /**
-     * Restore an already created String Trie from file. 
-     * It is possible to change the newly created Trie before calling the 
+     * Restore an already created String Trie from file. It is possible to
+     * change the newly created Trie before calling the
      * 'postProcessing()'-method.
+     *
      * @param filename
      */
     public StringTrie(String filename, String encoding) {
@@ -74,13 +76,13 @@ public class StringTrie {
         int[] delimiterWord = new int[1];
         delimiterWord[0] = 0;
         idToWordMap.put(0, delimiterWord);
-        
+
         try {
             // Open file and decode the gzip compressed data on the fly.
             InputStream inZip = new GZIPInputStream(new FileInputStream(filename));
-            Reader decoder = new InputStreamReader(inZip,encoding);
+            Reader decoder = new InputStreamReader(inZip, encoding);
             BufferedReader buffer = new BufferedReader(decoder);
-            
+
             if (buffer.readLine().equals("SpellCheckerDictionary")) {
                 if (verbose) {
                     System.err.println("Restoring a trie from the file " + filename);
@@ -105,13 +107,13 @@ public class StringTrie {
             System.err.println(e.getMessage());
         }
     }
-    
+
     ////////////////////////////////////////////////////////////////////////////
     ///// Modifier
     ////////////////////////////////////////////////////////////////////////////
-    
     /**
      * Reads a textfile and creates the lexicon and the language model from it.
+     *
      * @param filename
      * @throws IOException
      */
@@ -119,25 +121,25 @@ public class StringTrie {
         InputStream textInputStream = new FileInputStream(new File(filename));
         Reader textInReader = new InputStreamReader(textInputStream, encoding);
         BufferedReader buffer = new BufferedReader(textInReader);
-     
+
         String currentLine;
         String currentWord;
         double currentLineNumber = 0.0;
         int lastOutput = -1;
         int totalNumberOfLines = 0;
-        
+
         // create the moving window for the context
         // and initialize it
-        int[] idWindow = new int[context]; 
-        for (int i = 0; i < context; i++) { 
+        int[] idWindow = new int[context];
+        for (int i = 0; i < context; i++) {
             idWindow[i] = delimiter;
         }
         if (verbose) {
-            totalNumberOfLines = countLines(filename); // count lines 
+            totalNumberOfLines = countLines(filename); // count lines
             System.err.println("Creating the database from file " + filename);
             System.err.print("Progress: ");
         }
-        
+
         while ((currentLine = buffer.readLine()) != null) {
             ++currentLineNumber;
 
@@ -145,17 +147,18 @@ public class StringTrie {
             String[] tokenized = tokenizerPattern.split(currentLine);
             for (int i = 0; i < tokenized.length; i++) {
                 currentWord = tokenized[i];
+                if (currentWord.length() > 0) {
+                    for (int j = 0; j < context - 1; j++) {
+                        idWindow[j] = idWindow[j + 1]; // move the window to the left
+                    }
 
-                for (int j = 0; j < context - 1; j++) {
-                    idWindow[j] = idWindow[j + 1]; // move the window to the left
+                    int currentID = put(currentWord); // Save word in trie and get id for it
+                    idWindow[context - 1] = currentID;
+
+                    putContext(idWindow); // Store the ids for the words in the language model
                 }
-
-                int currentID = put(currentWord); // Save word in trie and get id for it
-                idWindow[context - 1] = currentID;
-
-                putContext(idWindow); // Store the ids for the words in the language model
             }
-            
+
             if (verbose) {
                 int progress = (int) Math.round(currentLineNumber / totalNumberOfLines * 100);
                 if (progress != lastOutput) {
@@ -164,14 +167,15 @@ public class StringTrie {
                 }
             }
         }
-        
+
         if (verbose) {
             System.err.println("\nFile read successfully.");
         }
     }
-    
+
     /**
      * Store a string in the lexicon (does not affect the language model).
+     *
      * @param key
      * @return The ID for the entered word.
      */
@@ -181,20 +185,20 @@ public class StringTrie {
         idToWordMap.put(id, decodedWord);
         return id;
     }
-    
+
     ////////////////////////////////////////////////////////////////////////////
     ///// Getter
     ////////////////////////////////////////////////////////////////////////////
-    
     /**
      * Check, if a given String is already in the lexicon
+     *
      * @param needle
      * @return
      */
     public boolean contains(String needle) {
         return actualTrie.contains(stringToIntArray(needle));
     }
-    
+
     /**
      * Check, if a given word as int-array is already in the lexicon
      *
@@ -206,35 +210,38 @@ public class StringTrie {
     }
 
     /**
-     * Return the Backoff-Probability for a given key. 
-     * The key must have the length of the context of this trie. 
-     * Each cell of the array must store the ID of a word.
+     * Return the Backoff-Probability for a given key. The key must have the
+     * length of the context of this trie. Each cell of the array must store the
+     * ID of a word.
+     *
      * @param key
      * @return
      */
     public double getBackOffProbability(int[] key) {
         return contextTrie.getProbability(key);
     }
-    
+
     /**
      * Returns the lecicon
+     *
      * @return
      */
     public Trie getLexicon() {
         return actualTrie;
     }
-    
+
     /**
-     * Calculates the probabilities in the language model. 
-     * Note: After calling this method, it can not be changed anymore!
+     * Calculates the probabilities in the language model. Note: After calling
+     * this method, it can not be changed anymore!
      */
     public void postProcessing() {
 //        contextTrie.calculateMLE();
         contextTrie.calculateMLElog();
     }
-    
+
     /**
      * Returns the number of nGrams
+     *
      * @return
      */
     public int getNGram() {
@@ -243,7 +250,7 @@ public class StringTrie {
     ////////////////////////////////////////////////////////////////////////////
     ///// Helper functions
     ////////////////////////////////////////////////////////////////////////////
- 
+
     private void init(int context) {
         this.context = context;
         actualTrie = new Trie(0, new IDCounter(1), new IntArraySet());
@@ -252,7 +259,7 @@ public class StringTrie {
         delimiterWord[0] = 0;
         idToWordMap.put(0, delimiterWord);
     }
-    
+
     // Returns the ID for a given word
     public int getWordID(int[] word) {
         return actualTrie.put(word);
@@ -262,7 +269,7 @@ public class StringTrie {
     public int[] getWordByID(int id) {
         return idToWordMap.get(id);
     }
-    
+
     // Transforms a list of word-IDs to a String, each word seperatd by 0
     String idsToWordsReadable(IntList ids) {
         StringBuilder ret = new StringBuilder();
@@ -274,12 +281,12 @@ public class StringTrie {
         }
         return ret.toString();
     }
-    
+
     // Writes a context into the language model
     private void putContext(int[] contextWindow) {
         contextTrie.put(contextWindow, this.context);
     }
-    
+
     // Converts a String into an int array, that holds the numeric values of the chars.
     public static int[] stringToIntArray(String word) {
         int[] ret = new int[word.length()];
@@ -299,7 +306,7 @@ public class StringTrie {
         }
         return buf.toString();
     }
-    
+
     // Converts a list of ints to a String by casting them to char.
     private String intListToString(IntList word) {
         StringBuilder buf = new StringBuilder();
@@ -308,7 +315,7 @@ public class StringTrie {
         }
         return buf.toString();
     }
-    
+
     // TODO: Check if used!
     private int[] readableStringToIntArray(String word) {
         int[] ret = new int[word.length()];
@@ -321,7 +328,7 @@ public class StringTrie {
         }
         return ret;
     }
-    
+
     // Counts the lines of a file in a very fast way.
     // Code taken from: http://stackoverflow.com/a/453067
     private int countLines(String filename) throws IOException {
@@ -344,7 +351,7 @@ public class StringTrie {
             is.close();
         }
     }
-    
+
     // Convert an array that stores the information for a context as characters
     // to an array of the length of context with the word IDs.
     int[] shortenContext(int[] word) {
@@ -381,18 +388,18 @@ public class StringTrie {
 
         return ret;
     }
-    
+
     public void setVerbose(boolean verbose) {
         this.verbose = verbose;
     }
-    
+
     ////////////////////////////////////////////////////////////////////////////
     ///// Filemanagement
     ////////////////////////////////////////////////////////////////////////////
-
     /**
-     * Draws the language model as dot-file.
-     * Note: This method calls the postProcessing method!
+     * Draws the language model as dot-file. Note: This method calls the
+     * postProcessing method!
+     *
      * @param filename
      */
     public void drawLanguageModel(String filename) {
@@ -409,6 +416,7 @@ public class StringTrie {
 
     /**
      * Draws the lexicon as dot-file
+     *
      * @param filename
      */
     public void drawLexicon(String filename) {
@@ -421,10 +429,11 @@ public class StringTrie {
             e.printStackTrace();
         }
     }
-    
+
     // Tutorial: www.mkyong.com/java/how-to-create-xml-file-in-java-dom/
     /**
      * Saves the whole trie in a file.
+     *
      * @param filename
      * @throws IOException
      */
@@ -457,7 +466,7 @@ public class StringTrie {
             e.printStackTrace();
         }
     }
-    
+
     private void saveConfig(BufferedWriter bw) throws IOException {
         bw.write("ngram : " + context + "\n");
         bw.write("#\n");
@@ -503,12 +512,12 @@ public class StringTrie {
             for (int i = 0; i < wordIDs.length; i++) {
                 wordIDs[i] = Integer.parseInt(words[i]); // convert stings of numbers to integer
             }
-            
+
             contextTrie.putWithCount(wordIDs, context, counts);
 
         }
     }
-    
+
 //        // Transforms a Stringlist to an int-array that seperates
 //    // the words with a 0 and writes the array into the contextTrie afterwards.
 //    private void putContext(String[] contextWindow) {
@@ -518,10 +527,10 @@ public class StringTrie {
 //        }
 //        // Consider space for the seperating 0 between words
 //        contextLength += context - 1;
-//        
+//
 //        int[] key = new int[contextLength];
 //        int index = 0;
-//        
+//
 //        for (int i = contextWindow.length-1; i >= 0; --i) {
 //            String currentWord = contextWindow[i];
 //            int wordLength = currentWord.length();
@@ -534,10 +543,9 @@ public class StringTrie {
 //
 //        contextTrie.put(key, this.context);
 //    }
-    
-  
     /**
      * Returns all worlds in the lexicon as Strings.
+     *
      * @return
      */
     @Override
