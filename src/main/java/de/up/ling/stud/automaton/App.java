@@ -200,6 +200,10 @@ public class App {
             } else if (args[i].equals("--corpus") || args[i].equals("-c")) {    // Corpus
                 if (i + 1 < args.length && !args[i + 1].startsWith("-")) {
                     corpus = args[i + 1];
+                    if (!fileExists(corpus)) {
+                        System.err.println("The corpus file specifiy with --corpus does not exist. Pleas choose a valid one.");
+                        System.exit(1);
+                    }
                 } else {
                     System.err.println("Please specify a correct filename for the input corpus.\nUse --help to view all commands.");
                     System.exit(1);
@@ -221,6 +225,10 @@ public class App {
             } else if (args[i].equals("--load") || args[i].equals("-l")) {     // load file
                 if (i + 1 < args.length && !args[i + 1].startsWith("-")) {
                     loadFile = args[i + 1];
+                    if (!fileExists(loadFile)) {
+                        System.err.println("The data file specifiy with --load does not exist. Pleas choose a valid one.");
+                        System.exit(1);
+                    }
                 } else {
                     System.err.println("Please specify a correct filename to load an existing trie.\nUse --help to view all commands.");
                     System.exit(1);
@@ -228,6 +236,10 @@ public class App {
             } else if (args[i].equals("--check") || args[i].equals("--correct")) {     // textfile
                 if (i + 1 < args.length && !args[i + 1].startsWith("-")) {
                     textFile = args[i + 1];
+                    if (!fileExists(textFile)) {
+                        System.err.println("The textfile specifiy with --correct does not exist. Pleas choose a valid one.");
+                        System.exit(1);
+                    }
                 } else {
                     System.err.println("Please specify a correct filename to an textfile that will be corrected.\nUse --help to view all commands.");
                     System.exit(1);
@@ -335,5 +347,10 @@ public class App {
         if (verbose) {
             System.out.println(text);
         }
+    }
+
+    private static boolean fileExists(String filename) {
+        File f = new File(filename);
+        return f.exists();
     }
 }
