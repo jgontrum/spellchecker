@@ -43,6 +43,14 @@ public class App {
     // This includes german umlauts as well. Taken from: http://stackoverflow.com/a/1612015
     private static final Pattern tokenizerPattern = Pattern.compile("[^\\p{L}]");
 
+    /**
+     * Takes a lot of arguments to create or load data and to check and correct
+     * a textfile.
+     *
+     * @param args
+     * @throws FileNotFoundException
+     * @throws IOException
+     */
     public static void main(String[] args) throws FileNotFoundException, IOException {
         numSuggestions = 5; // The number of wor candidates, that will be printed, when --details is enabled
         if (args.length < 2) {
@@ -93,6 +101,14 @@ public class App {
         }
     }
 
+    /**
+     * Corrects a file and writes the result in another file.
+     *
+     * @param fileIn
+     * @param fileOut
+     * @throws FileNotFoundException
+     * @throws IOException
+     */
     private static void correctFile(String fileIn, String fileOut) throws FileNotFoundException, IOException {
         InputStream textInputStream = new FileInputStream(new File(fileIn));
         Reader textInReader = new InputStreamReader(textInputStream, encoding);

@@ -119,7 +119,7 @@ public class BackOffModelTrie {
      * found in the trie.
      *
      * @param needle
-     * @return
+     * @return Probability of needle.
      */
     public double getProbability(int[] needle) {
         return getProbability(needle, 0);
@@ -237,7 +237,7 @@ public class BackOffModelTrie {
      * only be called in the root node of the trie.
      *
      * @param translator
-     * @return
+     * @return String that contains the trie in graphviz-format.
      */
     String draw(StringTrie translator) {
         StringBuilder ret = new StringBuilder();

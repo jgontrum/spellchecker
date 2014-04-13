@@ -37,7 +37,7 @@ public class EditDistance {
      *
      * @param firstWord
      * @param secondWord
-     * @return
+     * @return Editdistance
      */
     public int calcDistance(String firstWord, String secondWord) {
         String wordU = firstWord;
@@ -79,7 +79,7 @@ public class EditDistance {
      * @param secondWord
      * @param secondOffset
      * @param secondLength
-     * @return
+     * @return Editdistance
      */
     public int calcDistance(int[] firstWord, int firstOffset, int firstLength, int[] secondWord, int secondOffset, int secondLength) {
         m = firstLength;
@@ -118,7 +118,7 @@ public class EditDistance {
      *
      * @param firstWord
      * @param secondWord
-     * @return
+     * @return Editdistance
      */
     public int calcDistance(int[] firstWord, int[] secondWord) {
         m = firstWord.length;

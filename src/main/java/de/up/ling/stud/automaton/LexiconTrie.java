@@ -47,6 +47,7 @@ public class LexiconTrie {
      *
      * @param key
      * @param value
+     * @return ID for the entered word.
      */
     public int put(int[] key) {
         return put(key, 0);
@@ -107,7 +108,7 @@ public class LexiconTrie {
      * Returns true, if a word is in this trie.
      *
      * @param needle
-     * @return
+     * @return True if needle is in trie
      */
     public boolean contains(int[] needle) {
         return contains(needle, 0);
@@ -132,7 +133,7 @@ public class LexiconTrie {
      * Returns the ID for a given word.
      *
      * @param needle
-     * @return
+     * @return the wordID
      */
     public int getID(int[] needle) {
         return getID(needle, 0);
@@ -158,7 +159,7 @@ public class LexiconTrie {
      * given symbol.
      *
      * @param symbol
-     * @return
+     * @return Subtrie for a symbol.
      */
     public LexiconTrie getSubtrieByTransitionSymbol(int symbol) {
         return branches.get(symbol);
@@ -167,7 +168,7 @@ public class LexiconTrie {
     /**
      * Returns a set of all transition symbols.
      *
-     * @return
+     * @return Set of all transition symbols
      */
     public IntSet getAllTransitions() {
         return branches.keySet();
@@ -176,7 +177,7 @@ public class LexiconTrie {
     /**
      * Check, if this (sub) trie stands for a final state.
      *
-     * @return
+     * @return True, if trie is final.
      */
     public boolean isFinal() {
         return finalState;
@@ -186,7 +187,7 @@ public class LexiconTrie {
      * Get the next possible ID. This is public to help the StringTrie class
      * saving a trie.
      *
-     * @return
+     * @return The next free ID.
      */
     public int getNextID() {
         return idCounter.getNextID();
@@ -221,7 +222,7 @@ public class LexiconTrie {
     /**
      * Returns all valid concatenations of words below this trie.
      *
-     * @return
+     * @return Set of concatenations.
      */
     public Set<IntArrayList> getAllConcatinations() {
         Set<IntArrayList> ret = new HashSet<IntArrayList>();
@@ -290,7 +291,7 @@ public class LexiconTrie {
      * Returns a String that can be written in a file to represent this trie in
      * a dot file.
      *
-     * @return
+     * @return String in graphviz format.
      */
     public String draw() {
         StringBuilder ret = new StringBuilder();

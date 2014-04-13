@@ -34,7 +34,7 @@ public class Corrector {
      * Creates a new corrector based on a StringTrie, that has to contain some
      * data.
      *
-     * @param lexicon
+     * @param data
      */
     public Corrector(StringTrie data) {
         this.data = data;
@@ -55,13 +55,19 @@ public class Corrector {
         };
     }
 
+    /*
+
+     *
+     * @param context =
+     * @return
+     */
     /**
      * Corrects the last word in a given context and returns a sorted iterator
-     * over tupels of possivle candidates and their weight. Latter is returned
+     * over tupels of possible candidates and their weight. Latter is returned
      * only for debug reasons.
      *
-     * @param context = [PrevWord1, PrevWord2, MisspelledWord[
-     * @return
+     * @param context [PrevWord1, PrevWord2, MisspelledWord[
+     * @return Iterable over word-weight tuples
      */
     public Iterable<Pair<String, Double>> correctWordInContext(String[] context) {
         assert data != null;
@@ -114,7 +120,7 @@ public class Corrector {
      * Delivers possible candidates for a word.
      *
      * @param misspelledWord
-     * @return
+     * @return Iterable over word-weight tuples
      */
     public Iterable<Pair<String, Double>> correctWord(String misspelledWord) {
         String[] tempArray = new String[1];
@@ -130,7 +136,7 @@ public class Corrector {
      * @param misspelledWord
      * @param context
      * @param errorThreshold
-     * @return
+     * @return PriorityQueue with all candidates for the misspelledWord.
      */
     private PriorityQueue<WeightedWord> correctWord(int[] misspelledWord, int[] context, int errorThreshold) {
         // This is nearly a direct implementation of the algorithm of Oflazar.

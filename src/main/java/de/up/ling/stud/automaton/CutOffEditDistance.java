@@ -21,13 +21,13 @@ public class CutOffEditDistance {
     }
 
     /**
-     * String version to calculate the cutOffSitance between two words in the
+     * String version to calculate the cutOffDistance between two words in the
      * range of an error threshold (slower).
      *
      * @param incorrectWord
      * @param correctWord
      * @param error_threshold
-     * @return
+     * @return calculated cutOffDistance
      */
     public int calcCutOffDistance(String incorrectWord, String correctWord, int error_threshold) {
         minDistance = Integer.MAX_VALUE; // highes possible value
@@ -53,7 +53,7 @@ public class CutOffEditDistance {
      * @param incorrectWord
      * @param candidate
      * @param error_threshold
-     * @return
+     * @return the calculated cutOffDistance
      */
     public int calcCutOffDistance(int[] incorrectWord, int[] candidate, int error_threshold) {
         int m = incorrectWord.length;

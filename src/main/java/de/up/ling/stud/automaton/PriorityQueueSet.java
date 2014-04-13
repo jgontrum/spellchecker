@@ -34,7 +34,7 @@ class PriorityQueueSet<E> extends PriorityQueue<E> {
      * Returns a destructive iterator, that iterates over the queue in the
      * defined order.
      *
-     * @return
+     * @return Destructive iterator.
      */
     @Override
     public Iterator<E> iterator() {
@@ -62,7 +62,7 @@ class PriorityQueueSet<E> extends PriorityQueue<E> {
      * already exist in the queue.
      *
      * @param e
-     * @return
+     * @return False, if e is already in the queue.
      */
     @Override
     public boolean offer(E e) {
@@ -76,7 +76,7 @@ class PriorityQueueSet<E> extends PriorityQueue<E> {
     /**
      * Returns the size of the queue.
      *
-     * @return
+     * @return Size of the queue.
      */
     @Override
     public int size() {

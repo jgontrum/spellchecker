@@ -32,7 +32,7 @@ import java.util.zip.*;
  */
 public class StringTrie {
 
-    private LexiconTrie actualTrie;
+    private LexiconTrie lexiconTrie;
     private BackOffModelTrie contextTrie;
     private final Int2ObjectMap<int[]> idToWordMap;
     private int context;
@@ -183,7 +183,7 @@ public class StringTrie {
      */
     public int put(String key) {
         int[] decodedWord = stringToIntArray(key);
-        int id = actualTrie.put(decodedWord);
+        int id = lexiconTrie.put(decodedWord);
         idToWordMap.put(id, decodedWord);
         return id;
     }
@@ -195,20 +195,20 @@ public class StringTrie {
      * Check, if a given String is already in the lexicon
      *
      * @param needle
-     * @return
+     * @return True if needle is in the lexicon
      */
     public boolean contains(String needle) {
-        return actualTrie.contains(stringToIntArray(needle));
+        return lexiconTrie.contains(stringToIntArray(needle));
     }
 
     /**
      * Check, if a given word as int-array is already in the lexicon
      *
      * @param needle
-     * @return
+     * @return True if needle is in the lexicon
      */
     public boolean contains(int[] needle) {
-        return actualTrie.contains(needle);
+        return lexiconTrie.contains(needle);
     }
 
     /**
@@ -217,7 +217,7 @@ public class StringTrie {
      * ID of a word.
      *
      * @param key
-     * @return
+     * @return Probability
      */
     public double getBackOffProbability(int[] key) {
         return contextTrie.getProbability(key);
@@ -226,10 +226,10 @@ public class StringTrie {
     /**
      * Returns the lecicon
      *
-     * @return
+     * @return lexicon trie
      */
     public LexiconTrie getLexicon() {
-        return actualTrie;
+        return lexiconTrie;
     }
 
     /**
@@ -244,7 +244,7 @@ public class StringTrie {
     /**
      * Returns the number of nGrams
      *
-     * @return
+     * @return Number of used ngrams.
      */
     public int getNGram() {
         return context;
@@ -255,7 +255,7 @@ public class StringTrie {
 
     private void init(int context) {
         this.context = context;
-        actualTrie = new LexiconTrie(0, new IDCounter(1));
+        lexiconTrie = new LexiconTrie(0, new IDCounter(1));
         contextTrie = new BackOffModelTrie(context, context);
         int[] delimiterWord = new int[1];
         delimiterWord[0] = 0;
@@ -264,14 +264,14 @@ public class StringTrie {
 
     // Returns the ID for a given word
     public int getWordID(int[] word) {
-        return actualTrie.put(word);
+        return lexiconTrie.put(word);
     }
 
     /**
      * Returns the word for a given ID.
      *
      * @param id
-     * @return
+     * @return Word for the ID.
      */
     public int[] getWordByID(int id) {
         return idToWordMap.get(id);
@@ -299,7 +299,7 @@ public class StringTrie {
      * chars.
      *
      * @param word
-     * @return
+     * @return Int array for the given string.
      */
     public static int[] stringToIntArray(String word) {
         int[] ret = new int[word.length()];
@@ -314,7 +314,7 @@ public class StringTrie {
      * Converts an array of numbers to a String by casting the ints to char.
      *
      * @param word
-     * @return
+     * @return String for the given int array.
      */
     public static String intArrayToString(int[] word) {
         StringBuilder buf = new StringBuilder();
@@ -371,7 +371,7 @@ public class StringTrie {
                 } else {
                     int[] lookUp = new int[i - begin];
                     System.arraycopy(word, begin, lookUp, 0, i - begin);
-                    ret[counter] = actualTrie.getID(lookUp);
+                    ret[counter] = lexiconTrie.getID(lookUp);
                     ++counter;
                     begin = i + 1;
                 }
@@ -384,7 +384,7 @@ public class StringTrie {
         }
         int[] lookUp = new int[pos - begin];
         System.arraycopy(word, begin, lookUp, 0, pos - begin);
-        ret[counter] = actualTrie.getID(lookUp);
+        ret[counter] = lexiconTrie.getID(lookUp);
 
         // fill the rest of the array with the delimiter value
         for (int i = counter + 1; i < ret.length; i++) {
@@ -433,7 +433,7 @@ public class StringTrie {
         try {
             File file = new File(filename);
             BufferedWriter output = new BufferedWriter(new FileWriter(file));
-            output.write(actualTrie.draw());
+            output.write(lexiconTrie.draw());
             output.close();
         } catch (IOException e) {
             e.printStackTrace();
@@ -459,8 +459,8 @@ public class StringTrie {
             if (verbose) {
                 System.out.println("Writing lexicon...");
             }
-            bw.write(String.format("%d", actualTrie.getNextID()) + "\n");
-            actualTrie.saveWordsAndID(new int[0], bw);
+            bw.write(String.format("%d", lexiconTrie.getNextID()) + "\n");
+            lexiconTrie.saveWordsAndID(new int[0], bw);
             bw.write("#\n");
             if (verbose) {
                 System.out.println("Writing language model...");
@@ -490,7 +490,7 @@ public class StringTrie {
     private void restoreLexicon(BufferedReader buffer) throws IOException {
         buffer.readLine(); // get rid of the # character
         int oldMaxID = Integer.parseInt(buffer.readLine());
-        actualTrie = new LexiconTrie(oldMaxID, new IDCounter(oldMaxID));
+        lexiconTrie = new LexiconTrie(oldMaxID, new IDCounter(oldMaxID));
         for (String currentLine = buffer.readLine(); !currentLine.equals("#"); currentLine = buffer.readLine()) {
             // Line = 123,123,45,56 : 12
             String[] parts = currentLine.split(":"); // seperate the word from the id
@@ -505,7 +505,7 @@ public class StringTrie {
             // save the word in the trie with the stored id.
             // note that the ids of the final states will be restored from file,
             // while other states maybe get a different id than before.
-            actualTrie.putWithID(decodedWord, id);
+            lexiconTrie.putWithID(decodedWord, id);
             idToWordMap.put(id, decodedWord);
         }
     }
@@ -530,13 +530,13 @@ public class StringTrie {
     /**
      * Returns all worlds in the lexicon as Strings.
      *
-     * @return
+     * @return All words in the lexicon.
      */
     @Override
     public String toString() {
         StringBuilder buf = new StringBuilder("Words in Trie:\n");
 
-        for (IntArrayList concatenation : actualTrie.getAllConcatinations()) {
+        for (IntArrayList concatenation : lexiconTrie.getAllConcatinations()) {
 
             buf.append(intListToString(concatenation)).append("\n");
         }
