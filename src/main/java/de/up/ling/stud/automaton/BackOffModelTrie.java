@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package de.up.ling.stud.automaton;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -11,28 +7,43 @@ import it.unimi.dsi.fastutil.ints.IntList;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 /**
+ * Implementation of a trie that saves the contexts of a word. The trie is build
+ * in reverse order, so that the context [a, b, c] is saved in the order [c, b,
+ * a]. This is because 'c' will be a candidate for a misspelled word. Even if
+ * the previous words 'a' and 'b' have not been seen while learning, it will
+ * return some blurry probability (see Back Off Model). Note that this trie does
+ * only save the word IDs, not the real word. Use a LexiconTrie to resolve word
+ * IDs.
  *
  * @author Johannes Gontrum <gontrum@uni-potsdam.de>
  */
 public class BackOffModelTrie {
+
     private int count; // Like probability, but show the real count of it (for further calculation of the probability).
     private Int2ObjectMap<BackOffModelTrie> branches; // The outgoing transitions from this trie. Each symbol (int) maps to another trie.
     private double probability; // The conditioned probability for the context that lead to this trie.
-    private final boolean finalState; 
+    private final boolean finalState;
     private final int nGram; // Number of n-grams represented by this _sub_trie
     private final int allNGram; // Number of n-grams, that the complete trie represents. Invariant: In the top trie nGram == allNGram is true.
     private final double backOffFactor;
     private final double backOffFactorLog;
     private boolean locked; // After MLE the trie will be locked, so it will not be changed anymore.
-    
+
+    /**
+     * Creates a (sub)trie that represents a given number of ngrams of an
+     * overall number of ngrams. Example: The lowest subtrie, that holds only
+     * one word in a 4-gram model has currentNGram = 1 and overallNGram = 4.
+     *
+     * @param currentNGram
+     * @param overallNGram
+     */
     public BackOffModelTrie(int currentNGram, int overallNGram) {
-        branches = new Int2ObjectOpenHashMap<BackOffModelTrie>();   
+        branches = new Int2ObjectOpenHashMap<BackOffModelTrie>();
         probability = Double.POSITIVE_INFINITY; // Default value, if the probability is not calculated yet.
-        count = 0;  
+        count = 0;
         nGram = currentNGram;
         allNGram = overallNGram;
         locked = false;
@@ -44,9 +55,10 @@ public class BackOffModelTrie {
         }
         backOffFactorLog = Math.log(backOffFactor);
     }
-    
+
     /**
      * Writes a word, that represents a given number of nGrams into the trie.
+     *
      * @param key
      * @param nGrams
      */
@@ -55,10 +67,11 @@ public class BackOffModelTrie {
             put(key, nGrams, 0, 0);
         }
     }
-    
+
     /**
-     * Like put(int[], int), but for restoring already counted nGrams.
-     * Note: Use this function, when restoring the trie from a file.
+     * Like put(int[], int), but for restoring already counted nGrams. Note: Use
+     * this function, when restoring the trie from a file.
+     *
      * @param key
      * @param nGrams
      * @param count
@@ -68,12 +81,12 @@ public class BackOffModelTrie {
             put(key, nGrams, count, 0);
         }
     }
-    
+
     /**
      * Calculates the Maximum Likelihood Estimation of all nGrams in the trie.
-     * This method must be called, after all nGrams are written to the trie
-     * and before it is used by any other class. 
-     * Once this method is called, content changes are impossible.
+     * This method must be called, after all nGrams are written to the trie and
+     * before it is used by any other class. Once this method is called, content
+     * changes are impossible.
      */
     public void calculateMLE() {
         // Perform a dfs in the trie to calculate the MLE for the entries with the biggest n-gram first
@@ -83,12 +96,12 @@ public class BackOffModelTrie {
             branches.get(a).calculateMLE(count);
         }
     }
-    
+
     /**
-     * Calculates the Maximum Likelihood Estimation of all nGrams in the trie and 
-     * saves the logarithmic value of it.
-     * This method is like calculateMLE(), but it saves the log value, because in a
-     * huge corpus, the normal probabilities could become so small, they would be 0.
+     * Calculates the Maximum Likelihood Estimation of all nGrams in the trie
+     * and saves the logarithmic value of it. This method is like
+     * calculateMLE(), but it saves the log value, because in a huge corpus, the
+     * normal probabilities could become so small, they would be 0.
      */
     public void calculateMLElog() {
         // Perform a dfs in the trie to calculate the MLE for the entries with the biggest n-gram first
@@ -98,20 +111,20 @@ public class BackOffModelTrie {
             branches.get(a).calculateMLElog(count);
         }
     }
-    
+
     /**
-     * Returns a probability value for a given word/context.
-     * The returned value may no be exactly the cond. prob. for it, because
-     * it multiplied with a back-off-factor, resulting in better values the more
-     * of the context is found in the trie.
+     * Returns a probability value for a given word/context. The returned value
+     * may no be exactly the cond. prob. for it, because it multiplied with a
+     * back-off-factor, resulting in better values the more of the context is
+     * found in the trie.
+     *
      * @param needle
      * @return
      */
     public double getProbability(int[] needle) {
         return getProbability(needle, 0);
     }
-    
-    
+
     public boolean isFinal() {
         return finalState;
     }
@@ -119,7 +132,6 @@ public class BackOffModelTrie {
     ////////////////////////////////////////////////////////////////////////////
     ///// Recursive functions
     ////////////////////////////////////////////////////////////////////////////
-    
     private void put(int[] key, int nGrams, int count, int index) {
         // increase the counter only, if there is not a given value for count.
         if (this.finalState) {
@@ -135,9 +147,9 @@ public class BackOffModelTrie {
                 ++this.count;
             }
         }
-        
+
         nGrams -= 1;
-      
+
         if (index < key.length) {
             int currentKey = key[index];
             BackOffModelTrie nextTrie = branches.get(currentKey);
@@ -149,10 +161,9 @@ public class BackOffModelTrie {
             // go on recursivly, but move the index pointer to the next value in the key array
             nextTrie.put(key, nGrams, count, index + 1);
         }
-        
+
     }
-    
-    
+
     private void calculateMLE(double lastValidCount) {
         // lastValidCount represents the number of bare counts for the last complete n-gram.
         // If this state is a final one, calculate the conditioned probability for the current context given the shorter context with the count 'lastValidCount'
@@ -162,12 +173,11 @@ public class BackOffModelTrie {
         }
 
     }
-    
-    
+
     private void calculateMLElog(double lastValidCounLog) {
         // lastValidCount represents the number of bare counts for the last complete n-gram.
         // If this state is a final one, calculate the conditioned probability for the current context given the shorter context with the count 'lastValidCount'
-        
+
         // same calculation as in calculateMLE, but for logarithms:
         double countLog = Math.log(count);
         this.probability = countLog - lastValidCounLog + backOffFactorLog;
@@ -176,7 +186,7 @@ public class BackOffModelTrie {
         }
 
     }
-    
+
     private double getProbability(int[] needle, int index) {
         if (index == needle.length) {
             return probability;
@@ -191,15 +201,15 @@ public class BackOffModelTrie {
             return nextTrie.getProbability(needle, index + 1);
         }
     }
-    
+
     ////////////////////////////////////////////////////////////////////////////
     ///// Functions for saving the trie or drawing it in graphviz format
     ////////////////////////////////////////////////////////////////////////////
-
     /**
-     * Writes this (sub)trie into a given Buffer.
-     * Note: The function must be called within this package, because it should
-     * be called from a bigger output function
+     * Writes this (sub)trie into a given Buffer. Note: The function must be
+     * called within this package, because it should be called from a bigger
+     * output function
+     *
      * @param currentWord
      * @param bw
      * @throws IOException
@@ -216,15 +226,16 @@ public class BackOffModelTrie {
         if (isFinal()) {
             for (int i = 0; i < currentWord.length; ++i) {
                 bw.write(String.format("%d", currentWord[i])); // convert the number to string
-                bw.write((i != currentWord.length -1 ? "," : "")); //place a comma if needed
+                bw.write((i != currentWord.length - 1 ? "," : "")); //place a comma if needed
             }
             bw.write(":" + count + "\n");
         }
     }
-    
+
     /**
-     * Creates a String in dot-format for this trie.
-     * Note: This function should only be called in the root node of the trie.
+     * Creates a String in dot-format for this trie. Note: This function should
+     * only be called in the root node of the trie.
+     *
      * @param translator
      * @return
      */
@@ -232,7 +243,7 @@ public class BackOffModelTrie {
         StringBuilder ret = new StringBuilder();
         IntList history = new IntArrayList();
         List<String> nodes = new ArrayList<String>();
-        
+
         nodes.add("node [shape = " + (isFinal() ? "doublecircle" : "circle") + ", label=\"T()\\n" + printExtra()
                 + "\", fontsize=12] \"T()\";"); // add node for this trie
 
@@ -264,16 +275,16 @@ public class BackOffModelTrie {
                 IntList newHistory = new IntArrayList(history);
                 newHistory.add(a);
                 String nextState = "T(" + translator.idsToWordsReadable(newHistory) + ")";
-                nodes.add("node [shape = "  + (branches.get(a).isFinal() ? "doublecircle" : "circle") +  ", label=\"" 
-                        + nextState +"\\n" + branches.get(a).printExtra()
-                        + "\", fontsize=12] \""+ nextState +"\";"); 
-                ret.append("   \"" + currentState + "\" -> \""+ nextState +"\" [ label = \"" + label + "\" ];\n");
+                nodes.add("node [shape = " + (branches.get(a).isFinal() ? "doublecircle" : "circle") + ", label=\""
+                        + nextState + "\\n" + branches.get(a).printExtra()
+                        + "\", fontsize=12] \"" + nextState + "\";");
+                ret.append("   \"" + currentState + "\" -> \"" + nextState + "\" [ label = \"" + label + "\" ];\n");
                 ret.append(branches.get(a).drawTransitions(newHistory, nextState, nodes, translator));
             }
         }
         return ret.toString();
     }
-    
+
     private String printExtra() {
         StringBuilder ret = new StringBuilder();
         ret.append("Counts: " + count);

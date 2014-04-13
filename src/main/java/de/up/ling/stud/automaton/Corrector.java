@@ -1,35 +1,43 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package de.up.ling.stud.automaton;
 
 import com.google.common.base.Function;
+import com.google.common.collect.Iterables;
+import de.saar.basic.Pair;
+import it.unimi.dsi.fastutil.ints.IntIterator;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.PriorityQueue;
 import java.util.Stack;
-import com.google.common.collect.Iterables;
-import de.saar.basic.Pair;
-import it.unimi.dsi.fastutil.ints.IntIterator;
-import java.util.Objects;
 
 /**
- * Corrects a word or a word in a context and delivers an iterator over possible
- * candidates.
+ * Analyzes a given misspelled word that can be in a context and delivers a
+ * sorted iterator over possible candidates.
+ *
  * @author Johannes Gontrum <gontrum@uni-potsdam.de>
  */
 public class Corrector {
 
-    private StringTrie lexicon;
-    private final Comparator<WeightedWord> compareWeigtedWords;
-    private final int maxThreshold; // the maximal error threshold for a candidates
-    private final int minCandidates; // the minimal number of candidats that sould be found.
+    private StringTrie data;
     private final EditDistance editDistance;
     private final CutOffEditDistance cutOffEditDistance;
+    private final Comparator<WeightedWord> compareWeigtedWords;
+    /**
+     * The maximum error threshold for candidates.
+     */
+    private final int maxThreshold;
+    /**
+     * The minimal number of candidates that should be found.
+     */
+    private final int minCandidates;
 
-    public Corrector(StringTrie lexicon) {
-        this.lexicon = lexicon;
+    /**
+     * Creates a new corrector based on a StringTrie, that has to contain some
+     * data.
+     *
+     * @param lexicon
+     */
+    public Corrector(StringTrie data) {
+        this.data = data;
         this.maxThreshold = 3;
         this.minCandidates = 5;
         this.editDistance = new EditDistance();
@@ -41,24 +49,27 @@ public class Corrector {
                 return (elem1.getWordID() == elem2.getWordID())
                         ? 0 // elements are equal
                         : (elem1.getWeight() > elem2.getWeight()
-                        ? 1             // elem1 is greater 
+                        ? 1 // elem1 is greater
                         : -1);		// elem1 is smaller
             }
         };
     }
 
     /**
+     * Corrects the last word in a given context and returns a sorted iterator
+     * over tupels of possivle candidates and their weight. Latter is returned
+     * only for debug reasons.
      *
      * @param context = [PrevWord1, PrevWord2, MisspelledWord[
      * @return
      */
     public Iterable<Pair<String, Double>> correctWordInContext(String[] context) {
-        assert lexicon != null;
+        assert data != null;
         int nGram = context.length;
         int[] wordIDs = new int[nGram];
         int[] misspelledWord = StringTrie.stringToIntArray(context[nGram - 1]);
         int localMaxThreshold = maxThreshold; // The maximum of editdistances that we consider.
-        
+
         // create the context for the language model:
         // Convert every context word to an int array and get the wordID of it.
         // As soon as a context word is not found, stop the process.
@@ -66,34 +77,34 @@ public class Corrector {
         // at position 0. This is neccecary for an efficient lookup in the language model.
         for (int i = 1; i < nGram; i++) {
             int[] wordAsIntArray = StringTrie.stringToIntArray(context[nGram - i - 1]);
-            wordIDs[i] = lexicon.getWordID(wordAsIntArray);
+            wordIDs[i] = data.getWordID(wordAsIntArray);
         }
         wordIDs[0] = -1; // Set a dummy value for the cell, where the candidates will be placed.
 
         // Check first, if the word is in the lexicon (must not be the correct one though)
-        boolean inLexicon = lexicon.contains(misspelledWord);
+        boolean inLexicon = data.contains(misspelledWord);
         // If the current word is in the lexicon, we calculate only the distances from 1 to 2,
         // to check if the word is maybe very unplausible in the given context.
         if (inLexicon) {
             localMaxThreshold = 1;
         }
 
-        // Create a PriorityQueueSet, that has a special, destructive iterator (needed for the output - 
+        // Create a PriorityQueueSet, that has a special, destructive iterator (needed for the output -
         // the default iterator ignores the order in the queue)
         // and that makes sure, that there are no dublicted elements in the queue.
         PriorityQueueSet<WeightedWord> candidates = new PriorityQueueSet<WeightedWord>(50, compareWeigtedWords);
-        
+
         for (int i = 0; i <= localMaxThreshold || candidates.size() < minCandidates; ++i) {
             candidates.addAll(correctWord(misspelledWord, wordIDs, i));
         }
-        
+
         // Transform the items of the queue to strings only when needed
         return Iterables.transform(candidates,
                 new Function<WeightedWord, Pair<String, Double>>() {
             public Pair<String, Double> apply(WeightedWord word) {
-                int [] wordAsIntArray = lexicon.getWordByID(word.getWordID());
+                int[] wordAsIntArray = data.getWordByID(word.getWordID());
                 String wordAsString = StringTrie.intArrayToString(wordAsIntArray);
-                
+
                 return new Pair<String, Double>(wordAsString, word.getWeight());
             }
         });
@@ -101,21 +112,30 @@ public class Corrector {
 
     /**
      * Delivers possible candidates for a word.
+     *
      * @param misspelledWord
      * @return
      */
-    public Iterable<Pair<String,Double>> correctWord(String misspelledWord) {
+    public Iterable<Pair<String, Double>> correctWord(String misspelledWord) {
         String[] tempArray = new String[1];
         tempArray[0] = misspelledWord;
         return correctWordInContext(tempArray);
     }
 
-    // This method generates a priority queue for candidates the given word can
-    //  be corrected to within a given error threshold.
+    //
+    /**
+     * This method generates a priority queue for candidates the given word can
+     * be corrected to within a given error threshold.
+     *
+     * @param misspelledWord
+     * @param context
+     * @param errorThreshold
+     * @return
+     */
     private PriorityQueue<WeightedWord> correctWord(int[] misspelledWord, int[] context, int errorThreshold) {
         // This is nearly a direct implementation of the algorithm of Oflazar.
-        // It is agenda-driven (it hold unfinished concatenations of symbols 
-        // and a reference to the subtrie - a subtrie of 'lexicon'. 
+        // It is agenda-driven (it hold unfinished concatenations of symbols
+        // and a reference to the subtrie - a subtrie of 'lexicon'.
         // This reference is equivalent to the states that Oflazar uses).
         Stack<AgendaItem> agenda = new Stack<AgendaItem>();
         // All possible candidates that the misspelled Word can be corrected to
@@ -124,14 +144,14 @@ public class Corrector {
         PriorityQueue<WeightedWord> candidates = new PriorityQueue<WeightedWord>(20, compareWeigtedWords);
 
         // Initializing variables:
-        Trie currentTrie;
+        LexiconTrie currentTrie;
         int currentLength;
         IntIterator symbolIt;
         int coDistance;
         int edDistance;
 
         // Add a starting item: An empyy word and the whole trie (=> starting state)
-        agenda.add(new AgendaItem(new int[0], lexicon.getLexicon()));
+        agenda.add(new AgendaItem(new int[0], data.getLexicon()));
         while (!agenda.empty()) {
             AgendaItem currentItem = agenda.pop();
             int[] currentConcatenation = currentItem.getConcatenation();// current word
@@ -143,7 +163,7 @@ public class Corrector {
             while (symbolIt.hasNext()) {
                 int transitionSymbol = symbolIt.next();
 //                System.err.println("TransitionSymbol: " + (char) transitionSymbol);
-                // Creat the array for the new candidate. This candidate is like the 
+                // Creat the array for the new candidate. This candidate is like the
                 // current one, but with another symbol appended.
                 int[] newCandidate = new int[currentLength + 1];
                 // Copy the old concatenation to the new one and add the current symbol.
@@ -162,16 +182,16 @@ public class Corrector {
             edDistance = editDistance.calcDistance(misspelledWord, currentConcatenation);
             if (edDistance <= errorThreshold && currentTrie.isFinal()) {
                 // Retrive the wordid of the candidate from the lexicon and add it to the first cell of the context array.
-                context[0] = lexicon.getWordID(currentConcatenation);
-                
-                double backOffDistance = lexicon.getBackOffProbability(context);
-                
+                context[0] = data.getWordID(currentConcatenation);
+
+                double backOffDistance = data.getBackOffProbability(context);
+
                 // Make sure, the context is found in the model
                 if (backOffDistance < Double.POSITIVE_INFINITY) {
                     // This is not the best way to weight the edit distance and the probability, but at least
                     // it is way...
-                    double p = edDistance - (1 / (lexicon.getBackOffProbability(context)));
-                    
+                    double p = edDistance - (1 / (data.getBackOffProbability(context)));
+
                     WeightedWord word = new WeightedWord(context[0], p);
                     if (!candidates.contains(word)) {
                         candidates.add(word);
@@ -182,15 +202,19 @@ public class Corrector {
 
         return candidates;
     }
-    
+
     ////////////////////////////////////////////////////////////////////////////
     ///// Privated classes
-
+    /**
+     * Items for the agenda in the private correctWord function. Contains a
+     * concatenation and a subtrie (like the state in an automaton) for it.
+     */
     private class AgendaItem {
-        private final int[] concatenation;
-        private final Trie subTrie;
 
-        public AgendaItem(int[] concatenation, Trie subTrie) {
+        private final int[] concatenation;
+        private final LexiconTrie subTrie;
+
+        public AgendaItem(int[] concatenation, LexiconTrie subTrie) {
             this.concatenation = concatenation;
             this.subTrie = subTrie;
         }
@@ -199,7 +223,7 @@ public class Corrector {
             return concatenation;
         }
 
-        public Trie getTrie() {
+        public LexiconTrie getTrie() {
             return subTrie;
         }
 
@@ -209,7 +233,12 @@ public class Corrector {
         }
     }
 
+    /**
+     * Holds a word as a wordID and its weight. Used for sorting in a
+     * PriorityQueue.
+     */
     private class WeightedWord {
+
         private final int wordID;
         private final double weight;
 
@@ -248,8 +277,7 @@ public class Corrector {
             }
             return true;
         }
-        
-        
+
         @Override
         public String toString() {
             return "weightedWord{" + "wordID=" + wordID + ", weight=" + weight + '}';

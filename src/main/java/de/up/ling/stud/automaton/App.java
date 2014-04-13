@@ -18,8 +18,10 @@ import java.util.Iterator;
 import java.util.regex.Pattern;
 
 /**
- * Class for interaction between the command line and the spell checker classes.
+ * Main class that uses arguments from the command line and shows, how the
+ * internal classes can be used.
  *
+ * @author Johannes Gontrum <gontrum@uni-potsdam.de>
  */
 public class App {
 

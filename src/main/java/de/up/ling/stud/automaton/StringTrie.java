@@ -7,7 +7,6 @@ package de.up.ling.stud.automaton;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.ints.IntArraySet;
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
@@ -25,12 +24,15 @@ import java.util.regex.Pattern;
 import java.util.zip.*;
 
 /**
+ * Wrapper class that contains the tries for the lexicon and the language model.
+ * It also has the ability to save itself in a gzip compressed file and also to
+ * restore itself from it.
  *
  * @author Johannes Gontrum <gontrum@uni-potsdam.de>
  */
 public class StringTrie {
 
-    private Trie actualTrie;
+    private LexiconTrie actualTrie;
     private BackOffModelTrie contextTrie;
     private final Int2ObjectMap<int[]> idToWordMap;
     private int context;
@@ -226,7 +228,7 @@ public class StringTrie {
      *
      * @return
      */
-    public Trie getLexicon() {
+    public LexiconTrie getLexicon() {
         return actualTrie;
     }
 
@@ -253,7 +255,7 @@ public class StringTrie {
 
     private void init(int context) {
         this.context = context;
-        actualTrie = new Trie(0, new IDCounter(1), new IntArraySet());
+        actualTrie = new LexiconTrie(0, new IDCounter(1));
         contextTrie = new BackOffModelTrie(context, context);
         int[] delimiterWord = new int[1];
         delimiterWord[0] = 0;
@@ -265,7 +267,12 @@ public class StringTrie {
         return actualTrie.put(word);
     }
 
-    // Returns the word for a given ID
+    /**
+     * Returns the word for a given ID.
+     *
+     * @param id
+     * @return
+     */
     public int[] getWordByID(int id) {
         return idToWordMap.get(id);
     }
@@ -287,7 +294,13 @@ public class StringTrie {
         contextTrie.put(contextWindow, this.context);
     }
 
-    // Converts a String into an int array, that holds the numeric values of the chars.
+    /**
+     * Converts a String into an int array, that holds the numeric values of the
+     * chars.
+     *
+     * @param word
+     * @return
+     */
     public static int[] stringToIntArray(String word) {
         int[] ret = new int[word.length()];
 
@@ -297,7 +310,12 @@ public class StringTrie {
         return ret;
     }
 
-    // Converts an array of numbers to a String by casting the ints to char.
+    /**
+     * Converts an array of numbers to a String by casting the ints to char.
+     *
+     * @param word
+     * @return
+     */
     public static String intArrayToString(int[] word) {
         StringBuilder buf = new StringBuilder();
 
@@ -314,19 +332,6 @@ public class StringTrie {
             buf.append((char) word.getInt(i));
         }
         return buf.toString();
-    }
-
-    // TODO: Check if used!
-    private int[] readableStringToIntArray(String word) {
-        int[] ret = new int[word.length()];
-        for (int i = 0; i < word.length(); i++) {
-            if (word.charAt(i) == String.format("%d", delimiter).charAt(0)) {
-                ret[i] = 0;
-            } else {
-                ret[i] = (int) word.charAt(i);
-            }
-        }
-        return ret;
     }
 
     // Counts the lines of a file in a very fast way.
@@ -389,6 +394,11 @@ public class StringTrie {
         return ret;
     }
 
+    /**
+     * Enables/disables the verbose mode.
+     *
+     * @param verbose
+     */
     public void setVerbose(boolean verbose) {
         this.verbose = verbose;
     }
@@ -430,7 +440,6 @@ public class StringTrie {
         }
     }
 
-    // Tutorial: www.mkyong.com/java/how-to-create-xml-file-in-java-dom/
     /**
      * Saves the whole trie in a file.
      *
@@ -481,7 +490,7 @@ public class StringTrie {
     private void restoreLexicon(BufferedReader buffer) throws IOException {
         buffer.readLine(); // get rid of the # character
         int oldMaxID = Integer.parseInt(buffer.readLine());
-        actualTrie = new Trie(oldMaxID, new IDCounter(oldMaxID), new IntArraySet());
+        actualTrie = new LexiconTrie(oldMaxID, new IDCounter(oldMaxID));
         for (String currentLine = buffer.readLine(); !currentLine.equals("#"); currentLine = buffer.readLine()) {
             // Line = 123,123,45,56 : 12
             String[] parts = currentLine.split(":"); // seperate the word from the id
@@ -518,31 +527,6 @@ public class StringTrie {
         }
     }
 
-//        // Transforms a Stringlist to an int-array that seperates
-//    // the words with a 0 and writes the array into the contextTrie afterwards.
-//    private void putContext(String[] contextWindow) {
-//        int contextLength = 0;
-//        for (int i = 0; i < contextWindow.length; i++) {
-//            contextLength += contextWindow[i].length();
-//        }
-//        // Consider space for the seperating 0 between words
-//        contextLength += context - 1;
-//
-//        int[] key = new int[contextLength];
-//        int index = 0;
-//
-//        for (int i = contextWindow.length-1; i >= 0; --i) {
-//            String currentWord = contextWindow[i];
-//            int wordLength = currentWord.length();
-//            System.arraycopy(stringToIntArray(currentWord), 0, key, index, wordLength);
-//            index += wordLength + 1;
-//            if (index < contextLength) {
-//                key[index - 1] = 0;
-//            }
-//        }
-//
-//        contextTrie.put(key, this.context);
-//    }
     /**
      * Returns all worlds in the lexicon as Strings.
      *
@@ -554,7 +538,7 @@ public class StringTrie {
 
         for (IntArrayList concatenation : actualTrie.getAllConcatinations()) {
 
-            buf.append(intListToString(concatenation) + "\n");
+            buf.append(intListToString(concatenation)).append("\n");
         }
 
         return buf.toString();

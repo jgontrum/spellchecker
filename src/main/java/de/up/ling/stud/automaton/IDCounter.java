@@ -1,15 +1,13 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package de.up.ling.stud.automaton;
 
 /**
+ * Dummy class to hold a primitive int in an Object, that can be passed as a
+ * reference to avoid copying. Used in the LexiconTrie class.
  *
- * @author johannes
+ * @author Johannes Gontrum <gontrum@uni-potsdam.de>
  */
-    
 class IDCounter {
+
     int counter;
 
     public IDCounter(int counter) {
@@ -18,6 +16,6 @@ class IDCounter {
 
     int getNextID() {
         ++counter;
-        return counter-1;
+        return counter - 1;
     }
 }
