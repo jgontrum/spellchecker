@@ -183,9 +183,14 @@ public class App {
                     } else {
                         verbose("No candidate found for \"" + currentWord + "\".");
                         if (details) {
-                            textOut.write(currentWord + "\t\t|Suggestions: <NONE>");
+                            String space = "";
+                            for (int j = currentWord.length(); j < 30; ++j) {
+                                space = space.concat(" ");
+                            }
+
+                            textOut.write("\u2717 " + currentWord + space + " |Suggestions: <NONE>\n");
                         } else {
-                            textOut.write("<NOTFOUND> ");
+                            textOut.write("<NOTFOUND>");
                         }
                     }
                 }
@@ -322,10 +327,10 @@ public class App {
             System.exit(1);
         }
 
-        if (textFile.equals("") && saveTo.equals("")) {
-            System.err.println("Your arguments are not valid: Please specify a file that should be corrected (--check) and / or where a newly created trie should be saved (--save).\nUse --help to view all commands.");
-            System.exit(1);
-        }
+//        if (textFile.equals("") && saveTo.equals("")) {
+//            System.err.println("Your arguments are not valid: Please specify a file that should be corrected (--check) and / or where a newly created trie should be saved (--save).\nUse --help to view all commands.");
+//            System.exit(1);
+//        }
 
     }
 

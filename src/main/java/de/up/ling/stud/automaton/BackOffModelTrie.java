@@ -278,7 +278,7 @@ public class BackOffModelTrie {
                 nodes.add("node [shape = " + (branches.get(a).isFinal() ? "doublecircle" : "circle") + ", label=\""
                         + nextState + "\\n" + branches.get(a).printExtra()
                         + "\", fontsize=12] \"" + nextState + "\";");
-                ret.append("   \"" + currentState + "\" -> \"" + nextState + "\" [ label = \"" + label + "\" ];\n");
+                ret.append("   \"" + currentState + "\" -> \"" + nextState + "\" [ label = \"" + StringTrie.intArrayToString(translator.getWordByID(a)) + "(" + label + ")\" ];\n");
                 ret.append(branches.get(a).drawTransitions(newHistory, nextState, nodes, translator));
             }
         }

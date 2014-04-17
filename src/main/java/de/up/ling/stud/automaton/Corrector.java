@@ -38,7 +38,7 @@ public class Corrector {
      */
     public Corrector(StringTrie data) {
         this.data = data;
-        this.maxThreshold = 3;
+        this.maxThreshold = 5;
         this.minCandidates = 5;
         this.editDistance = new EditDistance();
         this.cutOffEditDistance = new CutOffEditDistance(editDistance);
@@ -100,7 +100,7 @@ public class Corrector {
         // and that makes sure, that there are no dublicted elements in the queue.
         PriorityQueueSet<WeightedWord> candidates = new PriorityQueueSet<WeightedWord>(50, compareWeigtedWords);
 
-        for (int i = 0; i <= localMaxThreshold || candidates.size() < minCandidates; ++i) {
+        for (int i = 0; i <= localMaxThreshold && candidates.size() < minCandidates; ++i) {
             candidates.addAll(correctWord(misspelledWord, wordIDs, i));
         }
 
@@ -196,8 +196,17 @@ public class Corrector {
                 if (backOffDistance < Double.POSITIVE_INFINITY) {
                     // This is not the best way to weight the edit distance and the probability, but at least
                     // it is way...
-                    double p = edDistance - (1 / (data.getBackOffProbability(context)));
-
+                    double p;
+                    if (backOffDistance == 0) { // Probaility of 1
+                        p = edDistance; //Avoid divistion by 0
+                    } else {
+                        p = edDistance - (1 / backOffDistance);
+                    }
+//                    System.err.println("b=" + backOffDistance);
+//                    System.err.println("w=" + StringTrie.intArrayToString(currentConcatenation));
+//                    System.err.println("W=" + StringTrie.intArrayToString(misspelledWord));
+//                    System.err.println("e=" + edDistance);
+//                    System.err.println("p=" + p + "\n");
                     WeightedWord word = new WeightedWord(context[0], p);
                     if (!candidates.contains(word)) {
                         candidates.add(word);

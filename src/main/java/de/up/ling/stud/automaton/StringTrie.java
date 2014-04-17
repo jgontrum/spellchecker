@@ -150,12 +150,12 @@ public class StringTrie {
             for (int i = 0; i < tokenized.length; i++) {
                 currentWord = tokenized[i];
                 if (currentWord.length() > 0) {
-                    for (int j = 0; j < context - 1; j++) {
-                        idWindow[j] = idWindow[j + 1]; // move the window to the left
+                    for (int j = context - 1; j > 0; j--) {
+                        idWindow[j] = idWindow[j - 1]; // move words in the window to the left
                     }
 
                     int currentID = put(currentWord); // Save word in trie and get id for it
-                    idWindow[context - 1] = currentID;
+                    idWindow[0] = currentID;
 
                     putContext(idWindow); // Store the ids for the words in the language model
                 }
